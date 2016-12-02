@@ -6,7 +6,8 @@ open System.Net
 type Direction = North=0 | East=1 | South=2 | West=3
 type Turn = Left='L' | Right='R'
 type Move = { Turn:Turn; NumberOfBlocks:uint32 }
-type Position = { direction:Direction; x:int; y:int }
+type Position = { x:int; y:int }
+type PosAndDirection = { direction:Direction; position:Position }
 
 let computeDirection (direction:Direction) (turn:Turn) =
     let directions : Direction array = unbox (Enum.GetValues(typeof<Direction>))
@@ -17,32 +18,50 @@ let computeDirection (direction:Direction) (turn:Turn) =
 
     let newIndex = match (int direction) + i with
                    | j when j < 0 -> directions.Length - 1
-                   | j when j >= directions.Length -> 0
-                   | j -> j
+                   | j -> j % directions.Length
     directions.[newIndex]
 
-let calculatePosition (position:Position) (move:Move) =
+let calculatePosition (pad:PosAndDirection) (move:Move) =
     let count = int move.NumberOfBlocks
-    let direction = computeDirection position.direction move.Turn
-    let x, y = position.x, position.y
-    let x, y = match direction with
-               | Direction.North -> x, y+count
-               | Direction.East  -> x+count, y
-               | Direction.South -> x, y-count
-               | Direction.West  -> x-count, y
-               | _  -> failwith "Invalid direction"
-    { direction=direction; x=x; y=y }
-
+    let direction = computeDirection pad.direction move.Turn
+    let x, y = pad.position.x, pad.position.y
+    let positions = [for i in 1 .. count -> match direction with
+                                            | Direction.North -> x, y+i
+                                            | Direction.South -> x, y-i
+                                            | Direction.East  -> x+i, y
+                                            | Direction.West  -> x-i, y
+                                            | _  -> failwith "Invalid direction"]
+    [for x,y in positions -> {direction=direction; position={x=x;y=y } }]
 let computeDistance start finish =
     Math.Abs ((finish.x - start.x) + (finish.y - start.y))
 
-let executeMoves moves =
-    let start = { direction=Direction.North; x=0; y=0 }
-    let finish = List.fold calculatePosition start moves
-    printfn "Easter bunny HQ is %i blocks away" (computeDistance start finish)
+let rec move start moves =
+    match moves with
+    | [] -> []
+    | head :: tail ->
+        let positions = calculatePosition start head
+        positions @ (move (positions.Item (positions.Length-1)) tail)
+let findShortestPathLength moves =
+    let start = { direction=Direction.North; position = { x=0; y=0 } }
+    let positions = move start moves
+    let finish = positions.Item (positions.Length-1)
+    printfn "[%A -> %A] Easter bunny HQ is %i blocks away" start.position finish.position (computeDistance start.position finish.position)
+let findFirstDuplicate moves =
+    let start = { direction=Direction.North; position = { x=0; y=0 } }
+    let positions = [for p in move start moves -> p.position]
+    
+    let rec checkIfVisited (positionSet:Set<Position>) (positionList:List<Position>) =
+        match positionList with
+        | [] -> None
+        | head :: tail -> if positionSet.Contains head then Some(head) else checkIfVisited (positionSet.Add head) tail
+    
+    let firstDuplicate = checkIfVisited Set.empty positions
+    match firstDuplicate with
+    | None -> printfn "No first duplicate"
+    | Some(p) -> printfn "%A is first duplicate (%i blocks away)" p (computeDistance start.position p) 
 
+// parsing code
 let charToTurn c = LanguagePrimitives.EnumOfValue<char, Turn>(c)
-
 let parseDirection text =
     match [for c in text -> c] with
     | letter :: number ->
@@ -52,6 +71,7 @@ let parseDirection text =
         }
     | [] -> failwith "empty string not allowed"
 
+// Input code
 let fetchUrl callback url =
     let request = WebRequest.Create (Uri url)
 
@@ -71,9 +91,12 @@ let parseInput parseElement delimiters (streamReader:IO.StreamReader) =
 let splitOnComma reader = parseInput parseDirection [|','|] reader 
 
 
-
-executeMoves (List.map parseDirection ["R2";"L3"])
-executeMoves (List.map parseDirection ["R2";"R2";"R2"])
-executeMoves (List.map parseDirection ["R5";"L5";"R5";"R3"])
+// execute!
+findShortestPathLength (List.map parseDirection ["R2";"L3"])
+findShortestPathLength (List.map parseDirection ["R2";"R2";"R2"])
+findShortestPathLength (List.map parseDirection ["R5";"L5";"R5";"R3"])
 // executeMoves (fetchUrl splitOnComma "http://adventofcode.com/2016/day/1/input")
-executeMoves (readFile splitOnComma @"input.txt")
+findShortestPathLength (readFile splitOnComma @"input.txt")
+
+findFirstDuplicate (List.map parseDirection ["R8"; "R4"; "R4"; "R8"])
+findFirstDuplicate (readFile splitOnComma @"input.txt")
