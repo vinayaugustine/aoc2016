@@ -48,10 +48,5 @@ let run fileName =
     |> System.String
     |> printfn "%s"
 
-    // for x,y in [for p in positions do if p.shouldPress then yield p.index] do
-        // printfn "%i,%i" x y
-        // printfn "%s" keypad.[y,x]
-        // printfn keypad.[y,x]
-
 // run "test.txt"
 run "input.txt"
