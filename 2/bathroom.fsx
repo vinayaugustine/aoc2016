@@ -1,3 +1,4 @@
+open System
 open System.IO
 
 type Move = Up='U' | Down='D' | Left='L' | Right='R'
@@ -35,14 +36,22 @@ let readInput fileName =
     |>  (Seq.reduce (@))
 
 let run fileName =
-    // TODO figure out Array2D
-    let keypad = [|[|7;8;9|];
-                   [|4;5;6|];
-                   [|1;2;3|]|]
+    let array =  [|[|'7';'8';'9'|];
+                   [|'4';'5';'6'|];
+                   [|'1';'2';'3'|]|]
+    let keypad = Array2D.init 3 3 (fun i j -> array.[i].[j])
+
     let positions = executeMoves (0,0) (2,2) { index=1,1; shouldPress=false } (readInput fileName)
-    for x,y in [for p in positions do if p.shouldPress then yield p.index] do
+    [for p in positions do if p.shouldPress then yield p.index]
+    |> List.map (fun (x,y) -> keypad.[y,x])
+    |> List.toArray
+    |> System.String
+    |> printfn "%s"
+
+    // for x,y in [for p in positions do if p.shouldPress then yield p.index] do
         // printfn "%i,%i" x y
-        printfn "%i" keypad.[y].[x]
+        // printfn "%s" keypad.[y,x]
+        // printfn keypad.[y,x]
 
 // run "test.txt"
 run "input.txt"
