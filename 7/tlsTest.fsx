@@ -34,11 +34,34 @@ let containsAbba2 = containsAbba 2
 let supportsTls abbaTest (address:Ipv7) =
     (address.parts |> List.exists abbaTest) && not (address.hypernetParts |> List.exists abbaTest)
 
+let isAba sequence =
+    match List.ofSeq sequence with
+    | [a;b;c] -> (a = c) && (a <> b) 
+    | _ -> failwith "invalid sequence"
+
+let getBab sequence =
+    match List.ofSeq sequence with
+    | [a;b;c] -> Seq.ofList [b;a;b] |> Array.ofSeq |> System.String
+    | _ -> String.Empty
+
+let supportsAba (address:Ipv7) =
+    let abas = address.parts |> Seq.collect (Seq.windowed 3 >> (Seq.filter isAba))
+    let babs = abas |> Seq.map getBab
+    
+    let partWithBab (candidateBabs:seq<string>) (hypernetPart:string) = candidateBabs |> Seq.exists (hypernetPart.Contains)
+    
+    address.hypernetParts |> Seq.exists (partWithBab babs)
+
 tests
 |> List.map (fun (a,t) -> lineToAddress a,t)
 |> List.filter (fun (a,t) -> not (supportsTls containsAbba2 a) = t)
 
 seq { for l in File.ReadLines @"input.txt" -> l }
 |> Seq.filter (lineToAddress >> (supportsTls containsAbba2))
+|> Seq.length
+|> printfn "%i"
+
+seq { for l in File.ReadLines @"input.txt" -> l }
+|> Seq.filter (lineToAddress >> supportsAba)
 |> Seq.length
 |> printfn "%i"
